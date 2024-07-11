@@ -29,7 +29,7 @@ languages:
       series: series
     menu:
       main:
-        - name: 😎 About 
+        - name: 🏠 Home 
           url: https://anass.ch/
           weight: 1
         - name: 🗄️ Archive
