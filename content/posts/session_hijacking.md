@@ -3,7 +3,7 @@ author: ["Anass"]
 title: "Session Hijacking 2.0: Emerging Threats and Defenses"
 date: "2024-10-07"
 description: "The new Frontier in Cyber Attacks."
-tags: ["Session Hijacking", "Infostealer", "MitM", "AitM", "BitM", "MFA bypass"]
+tags: ["Session Hijacking", "Infostealer", "MitM", "AitM", "BitM", "MFA Bypass Attack"]
 categories: ["Security", "Technology"]
 ShowToc: true
 ---
