@@ -5,7 +5,6 @@ title: Blog
 copyright: "© 2024 [Anass CHAHBOUNI](https://github.com/4nass/blog)"
 paginate: 5
 theme: [ hugo-PaperMod ]
-
 enableInlineShortcodes: true
 enableRobotsTXT: true
 buildDrafts: false
@@ -14,11 +13,9 @@ buildExpired: false
 enableEmoji: true
 pygmentsUseClasses: true
 mainsections: [ "about", "projects", "posts" ]
-
 minify:
   disableXML: true
   # minifyOutput: true
-
 languages:
   en:
     languageName: "English"
@@ -53,7 +50,6 @@ params:
   description: "Anass CHAHBOUNI - https://github.com/4nass/blog"
   author: Anass
   # author: ["Me", "You"] # multiple authors
-
   defaultTheme: auto
   # disableThemeToggle: true
   ShowShareButtons: true
@@ -69,15 +65,13 @@ params:
   ShowToc: true
   # comments: false
   images: [ "images/dutty_calls.png" ] # by Randall Munroe, CC BY-NC 2.5
-
   profileMode:
     enabled: false
 
   homeInfoParams:
     Title: "Anass's blog"
     Content: >
-      This blog is a personal exploration of the topics that fascinate me. It's a place where I can document my journey, share my knowledge, and reflect on the ever-evolving landscape of technology and security. While I enjoy engaging with readers, my primary goal is to offer well-researched, insightful content that can serve as a resource for anyone interested in these fields.  
-
+      This blog is a personal exploration of the topics that fascinate me. It's a place where I can document my journey, share my knowledge, and reflect on the ever-evolving landscape of technology and security. While I enjoy engaging with readers, my primary goal is to offer well-researched, insightful content that can serve as a resource for anyone interested in these fields.
   editPost:
     URL: "https://github.com/4nass/blog/tree/master/content"
     Text: "Suggest Changes" # edit text
