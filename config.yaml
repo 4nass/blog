@@ -4,7 +4,7 @@ baseURL: "https://blog.anass.ch/"
 title: Blog
 copyright: "© 2024 [Anass CHAHBOUNI](https://github.com/4nass/blog)"
 paginate: 5
-theme: [hugo-PaperMod]
+theme: [ hugo-PaperMod ]
 
 enableInlineShortcodes: true
 enableRobotsTXT: true
@@ -13,7 +13,7 @@ buildFuture: false
 buildExpired: false
 enableEmoji: true
 pygmentsUseClasses: true
-mainsections: ["about", "projects", "posts"]
+mainsections: [ "about", "projects", "posts" ]
 
 minify:
   disableXML: true
@@ -29,13 +29,13 @@ languages:
       series: series
     menu:
       main:
-        - name: 🏠 Home 
+        - name: 🏠 Home
           url: https://anass.ch/
           weight: 1
         - name: 🗄️ Archive
           url: archives
           weight: 5
-        - name: 🔎 Search 
+        - name: 🔎 Search
           url: search/
           weight: 10
         - name: 🏷️ Tags
@@ -68,7 +68,7 @@ params:
   ShowPageNums: true
   ShowToc: true
   # comments: false
-  images: ["images/dutty_calls.png"] # by Randall Munroe, CC BY-NC 2.5
+  images: [ "images/dutty_calls.png" ] # by Randall Munroe, CC BY-NC 2.5
 
   profileMode:
     enabled: false
@@ -76,13 +76,7 @@ params:
   homeInfoParams:
     Title: "Anass's blog"
     Content: >
-      👋 Hi there! I'm thrilled to have you here on my corner of the internet.  
-
-      Allow me to take you on a journey through the realms of technology, security, and Free and Open Source Software (FOSS).  
-
       This blog is a personal exploration of the topics that fascinate me. It's a place where I can document my journey, share my knowledge, and reflect on the ever-evolving landscape of technology and security. While I enjoy engaging with readers, my primary goal is to offer well-researched, insightful content that can serve as a resource for anyone interested in these fields.  
-
-      Whether you're a fellow tech enthusiast, a curious learner, or someone who enjoys the occasional deep dive into the world of technology, I'm glad you're here, and I hope you enjoy reading as much as I enjoy writing. Let's embark on this tech journey together, one post at a time!
 
   editPost:
     URL: "https://github.com/4nass/blog/tree/master/content"
