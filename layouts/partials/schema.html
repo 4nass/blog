@@ -33,7 +33,7 @@
     "name": {{ $siteName | jsonify }},
     "alternateName": "4nass",
     "description": {{ $metaDescription | plainify | jsonify }},
-    "inLanguage": {{ (.Site.Language.Locale | default .Site.Language.Lang) | jsonify }},
+    "inLanguage": {{ .Site.Language.Lang | jsonify }},
     "url": {{ site.Home.Permalink | jsonify }},
     "publisher": {
       "@type": "Person",
@@ -53,7 +53,7 @@
     "@type": "CollectionPage",
     "name": {{ .Title | plainify | jsonify }},
     "description": {{ $metaDescription | plainify | jsonify }},
-    "inLanguage": {{ (.Site.Language.Locale | default .Site.Language.Lang) | jsonify }},
+    "inLanguage": {{ .Site.Language.Lang | jsonify }},
     "url": {{ .Permalink | jsonify }},
     "isPartOf": {{ site.Home.Permalink | jsonify }}
   }
@@ -65,7 +65,7 @@
     "name": {{ .Title | plainify | jsonify }},
     "headline": {{ .Title | plainify | jsonify }},
     "description": {{ $metaDescription | plainify | jsonify }},
-    "inLanguage": {{ (.Site.Language.Locale | default .Site.Language.Lang) | jsonify }},
+    "inLanguage": {{ .Site.Language.Lang | jsonify }},
     "url": {{ .Permalink | jsonify }},
     "author": {
       "@type": "Person",
