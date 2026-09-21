@@ -1,0 +1,20 @@
+{{- $pages := .Pages -}}
+{{- if eq .RelPermalink ("posts/" | relLangURL) -}}
+  {{- $pages = where site.RegularPages "Section" "posts" -}}
+{{- end -}}
+{{- $paginator := .Paginate $pages -}}
+<section class="blog-list">
+  <header class="blog-list__header">
+    <div>
+      <p class="blog-list__eyebrow">Technical library</p>
+      <h1>{{ .Title | emojify }}</h1>
+      {{ with .Description }}<p class="blog-list__description">{{ . | plainify }}</p>{{ else }}{{ with .Summary }}<p class="blog-list__description">{{ . | plainify }}</p>{{ end }}{{ end }}
+    </div>
+  </header>
+  <div class="field-note-list">
+    {{ range $paginator.Pages }}
+      {{ partial "blog/field-note.html" (dict "page" . "headingLevel" "h2") }}
+    {{ end }}
+  </div>
+  {{ partial "pagination.html" . }}
+</section>

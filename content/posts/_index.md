@@ -1,5 +1,5 @@
 ---
-title: Blog
-summary: Contains posts related to `$$$`
-description: Contains posts related to $$$
+title: Writing
+summary: "Notes on security, identity, infrastructure and technology."
+description: "Notes on security, identity, infrastructure and technology."
 ---

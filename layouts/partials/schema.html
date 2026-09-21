@@ -1,0 +1,111 @@
+{{- $siteName := .Site.Params.brandName | default .Site.Title -}}
+{{- $metaDescriptionOrder := .Site.Params.seo.metaDescriptionOrder | default (slice "summary" "description" "site") -}}
+{{- $metaDescriptionSources := dict
+  "summary" .Params.Summary
+  "description" .Params.Description
+  "site" .Site.Params.description
+-}}
+{{- $metaDescription := "" -}}
+{{- range $metaDescriptionOrder -}}
+  {{- $metaDescription = $metaDescription | default (index $metaDescriptionSources (lower .)) -}}
+{{- end -}}
+{{- $author := .Site.Params.Author -}}
+{{- $sameAs := slice -}}
+{{- range $links := $author.links -}}
+  {{- range $platform, $url := $links -}}
+    {{- if not (strings.HasPrefix $url "mailto:") -}}
+      {{- $sameAs = $sameAs | append $url -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $authorName := $author.name | default $siteName -}}
+{{- $sectionTitle := .Section -}}
+{{- with site.GetPage .Section -}}
+  {{- $sectionTitle = .Title -}}
+{{- end -}}
+
+{{ if .IsHome -}}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": {{ site.Home.Permalink | jsonify }},
+    "name": {{ $siteName | jsonify }},
+    "alternateName": "4nass",
+    "description": {{ $metaDescription | plainify | jsonify }},
+    "inLanguage": {{ (.Site.Language.Locale | default .Site.Language.Lang) | jsonify }},
+    "url": {{ site.Home.Permalink | jsonify }},
+    "publisher": {
+      "@type": "Person",
+      "name": {{ $authorName | jsonify }}{{ if $sameAs }},
+      "sameAs": {{ $sameAs | jsonify }}{{ end }}
+    }
+  }
+  </script>
+{{ else if ne .Kind "404" -}}
+  {{- $iso8601 := "2006-01-02T15:04:05-07:00" -}}
+  {{- $isCollection := or (eq .Kind "section") (eq .Kind "taxonomy") (eq .Kind "term") (eq .Layout "archives") -}}
+  <script type="application/ld+json">
+  [
+  {{ if $isCollection -}}
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": {{ .Title | plainify | jsonify }},
+    "description": {{ $metaDescription | plainify | jsonify }},
+    "inLanguage": {{ (.Site.Language.Locale | default .Site.Language.Lang) | jsonify }},
+    "url": {{ .Permalink | jsonify }},
+    "isPartOf": {{ site.Home.Permalink | jsonify }}
+  }
+  {{ else -}}
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "articleSection": {{ $sectionTitle | plainify | jsonify }},
+    "name": {{ .Title | plainify | jsonify }},
+    "headline": {{ .Title | plainify | jsonify }},
+    "description": {{ $metaDescription | plainify | jsonify }},
+    "inLanguage": {{ (.Site.Language.Locale | default .Site.Language.Lang) | jsonify }},
+    "url": {{ .Permalink | jsonify }},
+    "author": {
+      "@type": "Person",
+      "name": {{ $authorName | jsonify }}{{ if $sameAs }},
+      "sameAs": {{ $sameAs | jsonify }}{{ end }}
+    },
+    {{ with .Date }}"dateCreated": {{ .Format $iso8601 | jsonify }},{{ end }}
+    {{ with .PublishDate }}"datePublished": {{ .Format $iso8601 | jsonify }},{{ end }}
+    {{ with .Lastmod }}"dateModified": {{ .Format $iso8601 | jsonify }},{{ end }}
+    {{ with .Params.tags }}"keywords": {{ . | jsonify }},{{ end }}
+    "mainEntityOfPage": {{ .Permalink | jsonify }},
+    "wordCount": {{ .WordCount | int }}
+  }
+  {{ end }}
+  {{ if site.Params.enableStructuredBreadcrumbs | default false }},
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {{- $position := 0 -}}
+      {{- range .Ancestors -}}
+        {{- if not .IsHome -}}
+          {{- $position = add $position 1 -}}
+          {
+            "@type": "ListItem",
+            "position": {{ $position }},
+            "name": {{ .Title | plainify | jsonify }},
+            "item": {{ .Permalink | jsonify }}
+          },
+        {{- end -}}
+      {{- end -}}
+      {{- $position = add $position 1 -}}
+      {
+        "@type": "ListItem",
+        "position": {{ $position }},
+        "name": {{ .Title | plainify | jsonify }},
+        "item": {{ .Permalink | jsonify }}
+      }
+    ]
+  }
+  {{ end }}]
+  </script>
+{{ end }}

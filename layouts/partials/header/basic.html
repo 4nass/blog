@@ -1,0 +1,15 @@
+{{ $brandName := .Site.Params.brandName | default .Site.Params.Author.name | default .Site.Title }}
+<div class="main-menu flex items-center w-full gap-2 p-1 pl-0">
+  <a href="{{ "" | relLangURL }}" class="site-brand text-base font-medium min-w-0 shrink">
+    {{ $brandName | markdownify }}
+  </a>
+  <span class="site-context hidden sm:inline-flex">Field notes</span>
+  <div class="flex items-center ms-auto">
+    <div class="hidden md:flex">
+      {{ partial "header/components/desktop-menu.html" . }}
+    </div>
+    <div class="flex md:hidden">
+      {{ partial "header/components/mobile-menu.html" . }}
+    </div>
+  </div>
+</div>

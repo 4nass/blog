@@ -1,0 +1,31 @@
+{{- $page := .page -}}
+{{- $headingLevel := .headingLevel | default "h2" -}}
+{{- $featured := .featured | default false -}}
+{{- $contentTypes := dict "vulnerability-brief" "Vulnerability brief" "field-lab" "Field lab" "security-analysis" "Security analysis" "systems-note" "Systems note" "industry-brief" "Industry brief" -}}
+{{- $kind := index $contentTypes ($page.Params.content_type | default "") | default "Technical note" -}}
+{{- $isCveBrief := hasPrefix $page.RelPermalink ("posts/cve/" | relLangURL) -}}
+{{- $summary := $page.Description | default ($page.Summary | plainify) -}}
+
+<article class="field-note{{ if $featured }} field-note--feature{{ end }}">
+  <div class="field-note__topline">
+    {{ if $isCveBrief }}
+      <a class="field-note__kind" href="{{ "posts/cve/" | relLangURL }}">{{ $kind }}</a>
+    {{ else }}
+      <span class="field-note__kind">{{ $kind }}</span>
+    {{ end }}
+    {{ with $page.Params.topics }}
+      <span class="field-note__divider" aria-hidden="true">·</span>
+      <span class="field-note__topic">{{ delimit . ", " }}</span>
+    {{ end }}
+    <span class="field-note__divider" aria-hidden="true">·</span>
+    <time datetime="{{ $page.Date.Format "2006-01-02" }}">{{ $page.Date.Format "2 Jan 2006" }}</time>
+    <span class="field-note__divider" aria-hidden="true">·</span>
+    <span>{{ $page.ReadingTime }} min read</span>
+  </div>
+  {{ if eq $headingLevel "h3" }}
+    <h3 class="field-note__title"><a href="{{ $page.RelPermalink }}">{{ $page.Title | emojify }}</a></h3>
+  {{ else }}
+    <h2 class="field-note__title"><a href="{{ $page.RelPermalink }}">{{ $page.Title | emojify }}</a></h2>
+  {{ end }}
+  {{ with $summary }}<p class="field-note__summary">{{ . | plainify | truncate 210 }}</p>{{ end }}
+</article>

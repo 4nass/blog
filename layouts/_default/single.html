@@ -1,0 +1,80 @@
+{{ define "main" }}
+  {{ $contentTypes := dict "vulnerability-brief" "Vulnerability brief" "field-lab" "Field lab" "security-analysis" "Security analysis" "systems-note" "Systems note" "industry-brief" "Industry brief" }}
+  {{ $kind := index $contentTypes (.Params.content_type | default "") | default "Technical note" }}
+  {{ $isCveBrief := hasPrefix .RelPermalink ("posts/cve/" | relLangURL) }}
+
+  <article class="article-dossier">
+    {{ if .Params.showHero | default (site.Params.article.showHero | default false) }}
+      {{ $heroStyle := .Params.heroStyle | default site.Params.article.heroStyle | default "basic" }}
+      {{ partial (printf "hero/%s.html" $heroStyle) . }}
+    {{ end }}
+
+    <header class="article-dossier__header">
+      {{ if .Params.showBreadcrumbs | default (site.Params.article.showBreadcrumbs | default false) }}
+        <div class="article-dossier__breadcrumbs">
+          {{ partial "breadcrumbs.html" . }}
+        </div>
+      {{ end }}
+
+      {{ if $isCveBrief }}
+        <a class="article-dossier__kind" href="{{ "posts/cve/" | relLangURL }}">{{ $kind }}</a>
+      {{ else }}
+        <p class="article-dossier__kind">{{ $kind }}</p>
+      {{ end }}
+      <h1>{{ .Title | emojify }}</h1>
+
+      {{ with .Description }}
+        <p class="article-dossier__dek">{{ . | markdownify }}</p>
+      {{ end }}
+
+      <dl class="article-dossier__facts">
+        <div>
+          <dt>Written by</dt>
+          <dd>{{ with .Params.author }}{{ delimit . ", " }}{{ else }}{{ site.Params.author.name | default "Anass Chahbouni" }}{{ end }}</dd>
+        </div>
+        <div>
+          <dt>Published</dt>
+          <dd><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02 Jan 2006" }}</time></dd>
+        </div>
+        <div>
+          <dt>Reading time</dt>
+          <dd>{{ .ReadingTime }} min read</dd>
+        </div>
+        {{ with .Params.topics }}
+          <div>
+            <dt>Topic</dt>
+            <dd>{{ delimit . ", " }}</dd>
+          </div>
+        {{ end }}
+      </dl>
+    </header>
+
+    <div class="article-dossier__layout">
+      <div class="article-dossier__main">
+        {{ $enableToc := site.Params.article.showTableOfContents | default false }}
+        {{ $enableToc = .Params.showTableOfContents | default $enableToc }}
+        {{ if and $enableToc (in .TableOfContents "<ul") }}
+          <div class="article-dossier__toc-mobile">
+            {{ partial "toc.html" . }}
+          </div>
+        {{ end }}
+
+        <div class="article-content prose dark:prose-invert">
+          {{ .Content }}
+        </div>
+
+        {{ partial "sharing-links.html" . }}
+        {{ partial "related.html" . }}
+        {{ partial "article-pagination.html" . }}
+        {{ partial "article-comments.html" . }}
+      </div>
+
+      {{ if and $enableToc (in .TableOfContents "<ul") }}
+        <aside class="article-dossier__toc" aria-label="Table of contents">
+          <p>On this page</p>
+          {{ partial "toc.html" . }}
+        </aside>
+      {{ end }}
+    </div>
+  </article>
+{{ end }}

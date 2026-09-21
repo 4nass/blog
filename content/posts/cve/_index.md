@@ -1,5 +1,5 @@
 ---
-title: CVE
-summary: Contains posts related to recent `CVE`
-description: Contains posts related to recent vulnerabilities
+title: "Vulnerability briefs"
+summary: "Briefs on published vulnerabilities: affected systems, likely impact and the actions worth taking."
+description: "Briefs on published vulnerabilities: affected systems, likely impact and the actions worth taking."
 ---

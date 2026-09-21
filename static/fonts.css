@@ -1,0 +1,24 @@
+/* Self-hosted fonts keep the first render independent from Google Fonts. */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  font-style: normal;
+  font-weight: 400 649;
+  font-display: swap;
+  src: url("/fonts/BricolageGrotesque-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  font-style: normal;
+  font-weight: 650 900;
+  font-display: swap;
+  src: url("/fonts/BricolageGrotesque-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Caveat";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/Caveat-Variable.woff2") format("woff2");
+}

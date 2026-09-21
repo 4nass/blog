@@ -1,0 +1,31 @@
+{{ define "main" }}
+  {{- $posts := where site.RegularPages "Section" "posts" -}}
+  <section class="blog-home">
+    <header class="blog-home__intro">
+      <p class="blog-eyebrow">Security, systems &amp; technology</p>
+      <h1>How systems <span class="blog-home__accent blog-home__accent--work">work.</span><span class="blog-home__line">And how they <span class="blog-home__accent blog-home__accent--fail">fail.</span></span></h1>
+      <p class="blog-home__lead">Notes on security research, identity, infrastructure and the technology we depend on.</p>
+    </header>
+
+    {{ if gt (len $posts) 0 }}
+      <section class="blog-home__feature" aria-labelledby="latest-field-note">
+        <div class="blog-home__section-header">
+          <h2 id="latest-field-note">Latest entry</h2>
+        </div>
+        {{ partial "blog/field-note.html" (dict "page" (index $posts 0) "featured" true) }}
+      </section>
+    {{ end }}
+
+    <section id="latest-notes" aria-labelledby="latest-notes-title">
+      <div class="blog-home__section-header">
+        <h2 id="latest-notes-title">Recent writing</h2>
+        <a href="{{ "posts/" | relLangURL }}">Browse all writing</a>
+      </div>
+      <div class="field-note-list">
+        {{ range first 3 (after 1 $posts) }}
+          {{ partial "blog/field-note.html" (dict "page" . "headingLevel" "h3") }}
+        {{ end }}
+      </div>
+    </section>
+  </section>
+{{ end }}

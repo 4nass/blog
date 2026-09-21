@@ -1,389 +1,427 @@
 ---
 author: ["Anass"]
-title: "From Evilginx2 to Session Hijacking: Building a Phishing Lab & Detection Rules"
+title: "Evilginx2 & Session Hijacking: The AitM Relay Problem"
 date: "2026-02-18"
-description: "A hands-on guide to setting up Evilginx2, executing AitM attacks, and building detection rules to identify session hijacking attempts."
-tags: ["Evilginx2", "Session Hijacking", "AitM", "Phishing", "Red Team", "MITM"]
-categories: ["Security", "Red Team", "Hands-On"]
+description: "A defensive analysis of Evilginx2-style adversary-in-the-middle attacks, authenticated-session theft and the controls that detect and contain token replay."
+tags: ["Evilginx2", "Session Hijacking", "AitM", "Phishing", "FIDO2", "Token Security"]
+categories: ["Security"]
+topics: ["Security"]
+content_type: "field-lab"
 ShowToc: true
 ---
 
-Session hijacking has evolved beyond traditional cookie theft. With Adversary-in-the-Middle (AitM) phishing kits like Evilginx2, attackers can intercept credentials and session tokens in real-time, bypassing even strong MFA solutions. In this hands-on guide, we'll build a controlled lab environment, execute a full phishing campaign, and develop detection rules to identify these attacks.
+Multi-factor authentication protects an authentication transaction. It does not automatically protect the authenticated session that follows.
 
-### Understanding the Threat
+An **adversary-in-the-middle (AitM)** proxy such as Evilginx2 places an attacker-controlled relay between a victim and the legitimate identity provider. The victim may see the real authentication flow and complete the password and MFA steps, while the proxy observes the conversation and attempts to capture the resulting session state.
 
-Evilginx2 is a man-in-the-middle proxy framework that sits between the victim and the legitimate website. Unlike traditional phishing, it:
+The result is often described as an “MFA bypass”. That description is imprecise. In the common case, the identity provider did authenticate the user and did evaluate MFA. The attacker stole or relayed the authenticated state after that decision, then attempted to reuse it from another context.
 
-- **Intercepts in real-time**: Captures credentials AND session cookies
-- **Bypasses MFA**: Captures the token after MFA is completed
-- **Uses real SSL**: Presents valid certificates to both victim and target
-- **Maintains session**: Victim stays logged in while attacker hijacks the session
+This article explains the attack boundary and the defensive controls without reproducing a phishing kit. It does not contain Evilginx2 installation instructions, phishlets, lure URLs, credential capture, cookie export or token replay.
 
-### The Attack Flow
+<!--more-->
 
-```
-Victim --> [Evilginx2 Proxy] --> Legitimate Website
-              ^                        ^
-              |                        |
-        Captures                 Returns
-        credentials              real content
-        + session
-        cookies
-```
+## The short version
 
----
+- **Evilginx2-style attack:** a reverse proxy relays a real sign-in flow through an attacker-controlled origin.
+- **What is captured:** credentials may be exposed, but the most valuable artifact is often the authenticated session or token.
+- **Why ordinary MFA may not stop it:** a completed session can be reused without starting authentication again.
+- **What does stop many AitM flows:** origin-bound, phishing-resistant methods such as FIDO2/WebAuthn and passkeys.
+- **What a valid certificate proves:** only that the browser trusts the certificate for that domain; it does not prove that the domain is legitimate.
+- **Main defensive objective:** detect context mismatch, revoke sessions quickly and prevent bearer-token replay where possible.
 
-### Lab Environment Setup
+> **Lab safety:** this article does not provide a phishing infrastructure, target-specific proxy configuration, credentials, cookies, tokens or instructions to test a real identity provider. The demonstration below uses synthetic session metadata and has no network I/O. Run any validation only against an application, account and domain that you own.
 
-#### Requirements
+## At a glance
 
-- **Attacker**: Kali Linux with public IP (or VPN service)
-- **Phishing server**: Ubuntu 20.04+ (can be VPS)
-- **Target simulation**: Local Nextcloud/Office 365 instance
+| Field | Details |
+| --- | --- |
+| Threat class | Adversary-in-the-middle and authenticated-session theft |
+| Common tool reference | Evilginx2-style reverse proxy |
+| Primary target | Credentials and post-authentication session state |
+| MFA limitation | MFA may be completed before the session is captured |
+| Typical impact | Impersonation within the session's scope and lifetime |
+| Strongest preventive control | Phishing-resistant, origin-bound authentication |
+| Detection focus | Origin, device, network and session-context mismatch |
+| Containment | Revoke sessions and tokens, reset credentials and investigate endpoint |
 
-#### Installing Evilginx2
+[MITRE ATT&CK T1557](https://attack.mitre.org/techniques/T1557/) describes adversary-in-the-middle positioning, while [T1539](https://attack.mitre.org/techniques/T1539/) covers the theft and reuse of web session cookies. [Okta's threat research](https://sec.okta.com/articles/phishingasaservice/) describes the operational pattern of real-time phishing proxies targeting enterprise identity flows.
 
-```bash
-# Clone and build Evilginx2
-git clone https://github.com/kgretzky/evilginx2.git
-cd evilginx2
-make
+## What Evilginx2 is—and is not
 
-# Or use the pre-built binary
-wget https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx-v3.3.0-linux-amd64
-chmod +x evilginx-v3.3.0-linux-amd64
-mv evilginx-v3.3.0-linux-amd64 evilginx2
-```
+Evilginx2 is an open-source reverse-proxy framework that can be configured to relay selected web authentication flows. In an AitM campaign, the attacker controls the public-facing origin while the legitimate identity provider remains the backend.
 
-#### Configuring DNS
+The proxy can potentially:
 
-You'll need a domain and configure DNS records:
+- present a look-alike URL to the victim;
+- relay requests and responses in real time;
+- observe credentials submitted through the relay;
+- observe the result of an MFA interaction;
+- capture an application session when it is established;
+- forward real content so the browser experience appears convincing.
 
-```
-Type: A     Name: login      Value: YOUR_VPS_IP
-Type: NS    Name: phish      Value: login.yourdomain.com
-```
+The proxy does not magically break the cryptography of FIDO2 or decrypt a properly protected token. It abuses the fact that a browser can be persuaded to authenticate through the wrong origin and that some authentication methods issue a bearer-like session after completion.
 
----
+It is also important not to confuse the tool with the attack. The same AitM pattern can be implemented with other frameworks, commercial phishing services or custom code. Detection should focus on the behaviour and the resulting session anomalies, not only on a process name.
 
-### Setting Up the Phishing Campaign
+## The AitM flow
 
-#### Step 1: Initialize Evilginx2
+The attack path can be represented without exposing any operational details:
 
-```bash
-# Start evilginx2
-sudo ./evilginx2
+~~~text
+Victim browser  --->  Attacker-controlled relay  --->  Legitimate IdP
+      |                       |                         |
+      |   credentials + MFA  |   forwards traffic      |
+      |---------------------->|------------------------>|
+      |                       |<------------------------|
+      |   authenticated page  |   observes session      |
+      |<----------------------|                         |
+      |                                                 |
+      |                 Attacker reuses session elsewhere
+~~~
 
-# Configure your domain
-config domain yourdomain.com
-config ip YOUR_VPS_IP
-```
+The security boundary changes during the flow:
 
-#### Step 2: Create Phishing Site
+1. The victim begins on an attacker-controlled origin.
+2. The relay forwards the browser's requests to the genuine identity provider.
+3. The victim completes the identity provider's authentication requirements.
+4. The identity provider issues an authenticated result.
+5. The relay attempts to retain the resulting state.
+6. The attacker uses the state against the relying party while it remains valid.
 
-```bash
-# Enable HTTP listener on port 80
-http on
+The important event is not only the initial MFA success. It is the later use of the session from a context that does not match the context in which it was created.
 
-# Get phishing templates (Office 365 example)
-phishlets hostname o365 login.yourdomain.com
-phishlets enable o365
+## Why ordinary MFA can arrive too late
 
-# Or create custom - use Nextcloud as example
-phishlets hostname nextcloud phish.yourdomain.com
-phishlets enable nextcloud
-```
+MFA is evaluated when the identity provider receives an authentication request. Many applications then create a session that is accepted for subsequent requests until it expires, is revoked or fails another policy check.
 
-#### Step 3: Generate Phishing Link
+If an attacker obtains that session after the MFA step:
 
-```bash
-# Create the phishing URL
-lures create o365
-lures get-url 1
+- the attacker may not need the password again;
+- the attacker may not need the MFA device again;
+- the attacker may not trigger another Conditional Access decision;
+- the relying party may see only a valid session identifier or bearer token.
 
-# Output example:
-# https://login.yourdomain.com/auth/login?ref=companyname
-```
+This is not a criticism of MFA. It is a reminder that authentication, session management and authorization are separate controls.
 
-#### Step 4: Launch the Phishing Page
+The risk is lower when:
 
-```bash
-# Start the phishlet
-phishlets enable o365
+- the session is short-lived and server-side revocable;
+- sensitive actions require reauthentication;
+- tokens are sender-constrained or device-bound;
+- the application participates in continuous evaluation;
+- the relying party checks device and risk context;
+- phishing-resistant authentication prevents the relay from completing the original ceremony.
 
-# View active sessions
-sessions
-```
+## What the attacker needs
 
----
+An AitM session-theft attack usually requires a combination of:
 
-### Executing the Attack (Lab Simulation)
+- a convincing delivery channel;
+- a domain or link the victim will open;
+- a relay that can handle the target authentication flow;
+- a user willing to continue the sign-in;
+- an authentication method whose result can be relayed or captured;
+- a relying party that accepts the resulting session without a fresh context check.
 
-#### Simulating Victim Interaction
+This is why the attack is not equivalent to “Evilginx bypasses everything”. The outcome depends on the identity provider, authentication method, browser, relying party, session format, device controls and user behaviour.
 
-1. Send phishing link to victim (in lab, open it yourself)
-2. Victim sees legitimate-looking login page
-3. Victim enters credentials → captured by Evilginx2
-4. Victim enters MFA token → also captured
-5. Victim sees real 365 dashboard (proxied)
-6. Attacker now has valid session cookie
+## Certificates are not an authenticity signal
 
-#### Captured Data
+The previous version of this article suggested that Evilginx uses self-signed certificates. That is not a reliable detection rule.
 
-In Evilginx2 console:
+An attacker-controlled domain can obtain a valid certificate from a public certificate authority. The browser may display a normal lock icon even though the hostname is fraudulent. Certificate validity proves domain control for TLS purposes; it does not prove that the domain belongs to Microsoft, Okta, Google or the organisation being impersonated.
 
-```
-sessions
+Useful URL checks are about the complete origin:
 
-SESSION ID: a1b2c3d4e5f6
-Username:  victim@company.com
-Password:  MySecureP@ss123!
-Tokens:    eyJ0eXAiOiJKV1Q...[JWT access token]
-           eyJrt...[refresh token]
-IP:        192.168.1.50
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)...
-Created:   2025-02-18 10:30:00
-```
+- scheme;
+- registrable domain;
+- subdomain;
+- path;
+- tenant or organisation context;
+- spelling and look-alike characters;
+- whether the link was expected.
 
-#### Hijacking the Session
+Certificate issuer, age or encryption status can enrich a detection model, but they should not be treated as proof of legitimacy.
 
-```bash
-# Get session cookie
-sessions -i a1b2c3d4e5f6
+## The role of phishing-resistant authentication
 
-# Export cookie in various formats
-sessions -i a1b2c3d4e5f6 --json
-sessions -i a1b2c3d4e5f6 --cookie
-sessions -i a1b2c3d4e5f6 --cookie-curl
+FIDO2/WebAuthn and passkeys use origin and relying-party information when creating and verifying the authentication response. A credential registered for one legitimate origin should not normally produce a valid response for an attacker-controlled origin.
 
-# Use with browser
-# Install "Cookie-Editor" extension
-# Paste exported cookie
-```
+This makes phishing-resistant authentication a strong preventive control against many AitM login flows. It does not solve every problem:
 
----
+- a compromised endpoint can still interact with an active session;
+- malware can abuse the browser after the user authenticates;
+- users can be tricked into registering an unwanted credential;
+- downstream applications may create weaker independent sessions;
+- account recovery can provide an alternate path.
 
-### Detection Strategies
+Use phishing-resistant authentication for privileged and high-impact accounts, then protect the resulting sessions and endpoints as well.
 
-#### Network-Level Detection
+## Safe local demonstration of session-context mismatch
 
-**1. SSL Certificate Analysis**
+The following Python model simulates a legitimate session followed by a request from a different device, region and browser family. It uses an opaque identifier and invented metadata only. It does not create a cookie, contact an IdP or replay a token.
 
-Evilginx2 uses self-signed certificates. Monitor for:
-
-```bash
-# Check certificate issuer differences
-# Legitimate: *.microsoft.com ( DigiCert Inc )
-# Phishing:  YourPhishingDomain ( Let's Encrypt )
+Save it as **aitm-session-context-model.py** and run:
 
-# Zeek script to detect certificate anomalies
-# Save as cert_anomaly.zeek
+~~~bash
+python aitm-session-context-model.py
+~~~
 
-event ssl_established(c: connection)
-{
-    if (c$ssl?$server_cert)
-    {
-        local issuer = c$ssl$server_cert$issuer;
-        local subject = c$ssl$server_cert$subject;
-        
-        # Alert if certificate doesn't match expected patterns
-        if ( /cloudflare|akamai|fastly|azure|microsoft|google/ !in issuer$O )
-        {
-            print fmt("Suspicious SSL certificate: %s from %s", subject, c$id$orig_h);
-        }
-    }
-}
-```
+~~~python
+from dataclasses import dataclass
 
-**2. HTTP Traffic Analysis**
 
-```bash
-# Look for duplicate requests (proxy pattern)
-# Evilginx forwards requests to real site AND logs them
+COMMAND_NAME = "aitm-session-context-model"
 
-# Zeek/Bro detection for request patterns
-# Multiple identical paths from different source IPs = suspicious
-```
 
-#### Host-Level Detection
+@dataclass
+class Session:
+    opaque_id: str
+    user: str
+    device: str
+    region: str
+    browser_family: str
+    revoked: bool = False
 
-**1. Chrome DevTools Investigation**
 
-Legitimate vs Phishing:
+@dataclass(frozen=True)
+class Request:
+    device: str
+    region: str
+    browser_family: str
+    sensitive_action: bool = False
 
-```javascript
-// Check document URL vs actual domain
-console.log('URL:', window.location.href);
-console.log('Hostname:', window.location.hostname);
 
-// Evilginx will show your phishing domain
-// Real Microsoft: login.microsoftonline.com
-// Phishing: login.yourdomain.com
-```
+def context_changes(session: Session, request: Request) -> int:
+    return sum(
+        (
+            session.device != request.device,
+            session.region != request.region,
+            session.browser_family != request.browser_family,
+        )
+    )
 
-**2. Certificate Pinning Check**
 
-```powershell
-# PowerShell to check certificate properties
-$cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object {$_.Subject -match "microsoft"}
-$cert | Format-List Subject, Issuer, Thumbprint
-```
+def evaluate(session: Session, request: Request) -> str:
+    if session.revoked:
+        return "DENY: session revoked"
 
-#### SIEM Detection Rules
+    changes = context_changes(session, request)
 
-**Sigma Rule - Suspicious Login Domain**
+    if request.sensitive_action and changes >= 2:
+        session.revoked = True
+        return "DENY: suspicious context; session revoked"
 
-```yaml
-title: AitM Phishing - Login Domain Mismatch
-id: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
-status: experimental
-description: Detects when login page domain doesn't match expected tenant
-author: Your Name
-date: 2025/02/18
+    if changes >= 2:
+        return "CHALLENGE: require reauthentication"
 
-logsource:
-    category: proxy
+    return "ALLOW: context is consistent"
 
-detection:
-    selection:
-        url|contains: '/login'
-        - referrer|contains: 'microsoftonline.com'
-        - referrer|contains: 'office.com'
-        - referrer|contains: 'login.microsoft.com'
-    condition: selection
 
-fields:
-    - src_ip
-    - url
-    - user_agent
-    - referrer
+session = Session(
+    opaque_id="opaque-session-1",
+    user="alice",
+    device="managed-laptop",
+    region="FR",
+    browser_family="browser-family-a",
+)
 
-level: high
-```
+normal_request = Request(
+    device="managed-laptop",
+    region="FR",
+    browser_family="browser-family-a",
+)
 
-**Splunk Query - Session Token Extraction**
+replay_request = Request(
+    device="unknown-host",
+    region="US",
+    browser_family="browser-family-b",
+    sensitive_action=True,
+)
 
-```spl
-index=proxy sourcetype=zscaler_zia
-| search url="/login" OR url="/auth/login"
-| stats count by src_ip, url, user_agent
-| where count > 10
-| eval severity=if(count>50, "critical", "medium")
-```
+print(COMMAND_NAME)
+print("normal request:", evaluate(session, normal_request))
+print("replay request:", evaluate(session, replay_request))
+print("after revoke  :", evaluate(session, normal_request))
+~~~
 
-#### Browser Forensics
+Expected output:
 
-**Chrome Network Flags**
+~~~text
+aitm-session-context-model
+normal request: ALLOW: context is consistent
+replay request: DENY: suspicious context; session revoked
+after revoke  : DENY: session revoked
+~~~
 
-```powershell
-# Check for proxy detection in Chrome
-# Open DevTools > Network
-# Look for requests to unusual domains
+This is a detection and response model, not a recommendation to bind every session to one IP address. Real deployments must account for travel, mobile networks, corporate proxies, VPNs and browser updates.
 
-# Cookie inspection
-# DevTools > Application > Cookies
-# Check Domain column - should match expected site
-```
+## Validation plan for an authorised lab
 
----
+Use a disposable account, a local or isolated test application and synthetic data. Do not configure a public phishing domain or place a real identity provider behind a relay.
 
-### Mitigation Strategies
+### Authentication policy
 
-#### For Organizations
+- verify that privileged users are required to use phishing-resistant authentication;
+- verify that legacy authentication paths are disabled;
+- verify that recovery and factor-registration paths require strong authentication;
+- verify that sensitive actions trigger reauthentication or step-up controls;
+- document which applications create their own independent sessions.
 
-**1. Implement FIDO2/WebAuthn**
+### Session lifecycle
 
-Phishing-resistant authentication:
+- confirm that sessions rotate after authentication and privilege changes;
+- verify idle and absolute expiration;
+- verify server-side logout and revocation;
+- verify that password and factor changes invalidate the expected sessions;
+- verify that access is denied after account disablement;
+- verify that a resource does not accept an expired or revoked session.
 
-```yaml
-# Azure AD Conditional Access Policy
-- Require phishing-resistant MFA
-  - Supported: FIDO2, Windows Hello for Business, Certificate-based auth
-  - Not supported: SMS, Voice, Email, Software OATH
-```
+### Detection and response
 
-**2. Token Binding**
+- create synthetic sign-in events with a changed device and region;
+- confirm that the identity platform records interactive and non-interactive use;
+- verify that alerts distinguish a context change from a normal network transition;
+- confirm that a suspicious session can be revoked without waiting for expiry;
+- measure false positives before enabling automatic blocking;
+- document the response time from alert to revocation.
 
-```yaml
-# Enable token binding in Azure AD
-# Prevents stolen tokens from being used on different devices
-```
+The objective is to prove the control plane—logging, risk evaluation, reauthentication and revocation—not to capture a working session.
 
-**3. Session Monitoring**
+## Detection strategy
 
-```powershell
-# Monitor for multiple sessions from different IPs
-# Azure AD Sign-in Logs > Session ID analysis
+No single signal identifies every AitM campaign. Correlate several weak signals.
 
-Get-AzureAdSignInLogs -Filter "appDisplayName eq 'Office 365'" |
-    Where-Object { $_.IPAddress -ne $_.PreviousSignInIPAddress } |
-    Select-Object UserPrincipalName, IPAddress, Location, CreatedDateTime
-```
+### Identity-provider signals
 
-**4. Network Segmentation**
+- a new sign-in context shortly after a normal authentication;
+- a successful MFA event followed by activity from an unrelated device;
+- interactive and non-interactive events that disagree on platform or location;
+- a session or token used from an ASN, region or user agent not associated with the original event;
+- access to sensitive resources without a corresponding fresh authentication;
+- multiple accounts showing similar new-domain or infrastructure patterns.
 
-```powershell
-# Block direct connections to unknown IPs
-# Force all traffic through proxy
-# Implement Zero Trust Network Access (ZTNA)
-```
+Avoid treating “impossible travel” as proof. Proxies, mobile networks and cloud egress can produce false positives. It is most useful when combined with endpoint and session evidence.
 
-#### For Individuals
+### Endpoint signals
 
-**1. Check the URL Bar**
+- a browser launched from an unusual parent process;
+- an unsigned or untrusted extension added shortly before the event;
+- suspicious access to browser profile directories;
+- malware or scripting activity targeting browser processes;
+- a new local proxy or unexpected proxy configuration;
+- a browser session continuing after the endpoint has generated an EDR alert.
 
-```
-✓ Real: https://login.microsoftonline.com/...
-✗ Fake: https://login.company-phish.com/...
-✗ Fake: https://microsoft.login.yourdomain.com/...
-```
+MITRE's [T1539 detection guidance](https://attack.mitre.org/techniques/T1539/) includes monitoring suspicious access to browser cookie stores and memory, as well as token reuse from unusual user agents or locations. These controls require careful privacy and false-positive management.
 
-**2. Verify Certificate**
+### Network and email signals
 
-Click lock icon → Check issuer → Verify organization name
+- links using look-alike registrable domains;
+- newly registered or newly observed authentication domains;
+- DNS changes inconsistent with a known service;
+- mail messages whose visible brand and actual link origin disagree;
+- a login journey that begins from a domain not approved for the service;
+- TLS metadata inconsistent with the expected domain, used only as an enrichment signal.
 
-**3. Use Browser Isolation**
+The browser's lock icon is not a sufficient control. Enforce approved origins through safe-link rewriting, DNS and web filtering, browser policies and user-facing reporting.
 
-```yaml
-# Implement browser isolation for risky activities
-# Remote browser isolation (RBI) solutions:
-# - Authentic8
-# - Talon
-# - Ericom
-```
+## Containment and incident response
 
-**4. Check Session Properties**
+When an AitM session is suspected:
 
-Many services show "Active sessions" - check for unknown locations/IPs
+1. revoke active sessions and refresh tokens for the affected account;
+2. reset the password from a trusted endpoint;
+3. require fresh phishing-resistant authentication;
+4. isolate and preserve the suspected endpoint;
+5. review registered devices, authentication methods and OAuth consents;
+6. inspect mailbox rules, files, API calls and administrative actions;
+7. identify downstream applications with independent sessions;
+8. search for the same domain, infrastructure and campaign pattern across users;
+9. preserve identity, endpoint, email and proxy logs.
 
----
+Password reset alone may not remove a session that has already been issued. Sign-out from one application may not terminate the IdP session or another application's local session. The revocation plan must cover all layers.
 
-### Conclusion
+## Hardening priorities
 
-AitM attacks using Evilginx2 represent a paradigm shift in phishing. Traditional MFA solutions cannot stop an attacker who intercepts the session after authentication. The key defense is:
+### 1. Prefer origin-bound authentication
 
-1. **Phishing-resistant authentication** (FIDO2/WebAuthn)
-2. **Continuous session validation** (device posture, IP reputation)
-3. **Network-level detection** (certificate anomalies, traffic patterns)
-4. **User education** (URL verification, certificate checking)
+Require FIDO2, WebAuthn, passkeys or another phishing-resistant method for privileged users and high-impact applications. Do not downgrade to SMS or software codes because a migration is inconvenient.
 
-Understanding how these attacks work is crucial for both red teamers and defenders. Build your lab, test the attack, and then build your detection rules.
+### 2. Reduce bearer-token value
 
----
+Where supported:
 
-**Lab Challenge**: 
+- use sender-constrained or device-bound tokens;
+- rotate refresh tokens and detect reuse;
+- scope tokens to one audience and minimum permissions;
+- avoid long-lived tokens in browser local storage;
+- use a backend-for-frontend pattern where it reduces browser exposure;
+- revoke tokens after password, factor or risk events.
 
-1. Set up Evilginx2 with a test domain
-2. Create a phishing page for a service (Nextcloud is great for learning)
-3. Capture your own session
-4. Write a detection rule that would catch your test
-5. Implement one mitigation and verify it blocks the attack
+Token protection and continuous evaluation are not universal. Verify support by operating system, client and resource.
 
----
+### 3. Strengthen session management
 
-**Sources:**
+For web applications:
 
-1. [Evilginx2 GitHub](https://github.com/kgretzky/evilginx2)
-2. [AitM Attack Overview - Okta](https://sec.okta.com/articles/2023/08/mitm-aitm-attacks)
-3. [Cloudflare - AitM Detection](https://blog.cloudflare.com/how-to-detect-adversary-in-the-middle-aitm-attacks/)
-4. [MITRE ATT&CK - Phishing](https://attack.mitre.org/techniques/T1566/)
+- set Secure, HttpOnly and an appropriate SameSite attribute on session cookies;
+- prefer host-only cookies and the __Host- prefix where compatible;
+- rotate the session identifier after login and privilege changes;
+- use idle and absolute timeouts;
+- avoid session identifiers in URLs, logs and referrerable content;
+- require CSRF protection for state-changing requests;
+- enforce reauthentication before high-impact actions;
+- provide a reliable server-side revocation path.
+
+Cookie flags protect specific delivery and browser behaviours. They do not make a stolen active session harmless.
+
+### 4. Harden enrollment and recovery
+
+An attacker often targets the weakest alternate path:
+
+- new-device registration;
+- factor replacement;
+- password recovery;
+- application consent;
+- help-desk verification;
+- legacy protocols.
+
+Protect these flows with strong authentication, approval controls, rate limits, audit events and separate monitoring. A strong primary login is not enough if recovery can silently create a new trusted session.
+
+### 5. Protect the endpoint and browser
+
+- restrict browser extensions;
+- keep browsers and operating systems current;
+- block untrusted downloads and unsigned tooling;
+- deploy EDR with browser and credential-access telemetry;
+- remove local administrator rights;
+- isolate privileged administration from everyday browsing;
+- use managed browser policies and approved authentication origins.
+
+### 6. Make the response fast
+
+Define who can revoke sessions, disable accounts, remove OAuth consents and isolate endpoints. Measure the time from a high-confidence alert to containment. A perfect detection rule that nobody can act on is not a complete control.
+
+## What this teaches
+
+Evilginx2-style attacks expose the gap between authenticating a user and protecting the session that follows. MFA can be correctly enforced while the resulting session is still stolen through a compromised browser, endpoint or relay.
+
+The practical questions are:
+
+- Is the authentication method bound to the legitimate origin?
+- Which artifact represents the session after MFA?
+- Can that artifact be replayed from another device?
+- Does the application detect context changes?
+- Can every related session and token be revoked quickly?
+- Are recovery and downstream applications protected to the same standard?
+
+The right response is not to abandon MFA. It is to combine phishing-resistant authentication, hardened session management, endpoint protection, behavioural detection and rapid revocation.
+
+## Sources
+
+1. [MITRE ATT&CK — Adversary-in-the-Middle (T1557)](https://attack.mitre.org/techniques/T1557/)
+2. [MITRE ATT&CK — Steal Web Session Cookie (T1539)](https://attack.mitre.org/techniques/T1539/)
+3. [Okta Security — Keeping Phishing Adversaries Out of the Middle](https://sec.okta.com/articles/phishingasaservice/)
+4. [OWASP — Cookie Theft Mitigation](https://cheatsheetseries.owasp.org/cheatsheets/Cookie_Theft_Mitigation_Cheat_Sheet.html)
+5. [OWASP — Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+6. [CISA — Identity and Access Management Recommended Best Practices](https://www.cisa.gov/sites/default/files/2023-12/ESF%20IDENTITY%20AND%20ACCESS%20MANAGEMENT%20RECOMMENDED%20BEST%20PRACTICES%20FOR%20ADMINISTRATORS%20PP-23-0248_508C.pdf)
