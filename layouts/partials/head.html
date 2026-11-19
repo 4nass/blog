@@ -33,6 +33,9 @@
   {{ with  .Params.Tags | default .Site.Params.keywords }}
     <meta name="keywords" content="{{ range . }}{{ . }},{{ end }}">
   {{ end }}
+  {{ if or (not .IsPage) (eq .Layout "about") }}
+    <meta name="robots" content="max-image-preview:none">
+  {{ end }}
   {{ with .Site.Params.robots }}
     <meta name="robots" content="{{ . }}">
   {{ end }}
@@ -124,10 +127,10 @@
   {{ end }}
   {{ with $socialImageURL }}
     <meta name="twitter:image" content="{{ . | absURL }}">
-    <meta name="twitter:image:alt" content="Field notes by Anass Chahbouni">
+    <meta name="twitter:image:alt" content="Anass Chahbouni — Field notes on security, systems and technology">
     <meta property="og:image" content="{{ . | absURL }}">
-    <meta property="og:image:alt" content="Field notes by Anass Chahbouni">
-    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:alt" content="Anass Chahbouni — Field notes on security, systems and technology">
+    <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
   {{ end }}

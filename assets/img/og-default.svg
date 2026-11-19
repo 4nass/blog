@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">Field Notes by Anass Chahbouni</title>
+  <desc id="description">Technical writing on security, systems and technology.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f" />
+      <stop offset="0.58" stop-color="#0b1c2a" />
+      <stop offset="1" stop-color="#06131d" />
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#0f766e" stop-opacity="0.42" />
+      <stop offset="1" stop-color="#0f766e" stop-opacity="0" />
+    </radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#7dd3c7" stroke-opacity="0.08" stroke-width="1" />
+      <circle cx="0" cy="0" r="1.5" fill="#99f6e4" fill-opacity="0.18" />
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)" />
+  <rect width="1200" height="630" fill="url(#grid)" />
+  <ellipse cx="600" cy="285" rx="470" ry="350" fill="url(#glow)" />
+  <path d="M70 470h180l55-105 66 149 68-92h72m364-50h88l48 82 55-127h62" fill="none" stroke="#5eead4" stroke-opacity="0.16" stroke-width="2" />
+  <rect x="24" y="24" width="1152" height="582" rx="28" fill="none" stroke="#a5f3ec" stroke-opacity="0.16" />
+  <g text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+    <rect x="548" y="72" width="104" height="104" rx="30" fill="#0b2432" stroke="#2dd4bf" stroke-opacity="0.56" stroke-width="2" />
+    <text x="600" y="142" fill="#f8fafc" font-size="47" font-weight="700" letter-spacing="-4">AC</text>
+    <circle cx="640" cy="93" r="4" fill="#5eead4" />
+    <text x="600" y="232" fill="#5eead4" font-size="20" font-weight="700" letter-spacing="5">FIELD NOTES</text>
+    <text x="600" y="330" fill="#f8fafc" font-size="57" font-weight="700" letter-spacing="-1.5">Security, systems</text>
+    <text x="600" y="397" fill="#f8fafc" font-size="57" font-weight="700" letter-spacing="-1.5">&amp; technology</text>
+    <rect x="552" y="438" width="96" height="3" rx="1.5" fill="#5eead4" />
+    <text x="600" y="488" fill="#d2dee7" font-size="25">Technical notes by Anass Chahbouni</text>
+    <text x="600" y="548" fill="#83d9cc" font-size="19" letter-spacing="3">BLOG.ANASS.CH</text>
+  </g>
+</svg>
