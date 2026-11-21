@@ -48,7 +48,7 @@ params:
   mainSections:
     - posts
   description: "Technical notes on security, identity, infrastructure and the systems we rely on."
-  defaultSocialImage: "img/og-default.png"
+  homepageSocialImage: "img/og-home.png"
   copyright: "© 2024 - 2026 Anass CHAHBOUNI"
 
   seo:

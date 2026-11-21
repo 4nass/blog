@@ -33,14 +33,16 @@
   {{ with  .Params.Tags | default .Site.Params.keywords }}
     <meta name="keywords" content="{{ range . }}{{ . }},{{ end }}">
   {{ end }}
-  {{ if or (not .IsPage) (eq .Layout "about") }}
-    <meta name="robots" content="max-image-preview:none">
-  {{ end }}
   {{ with .Site.Params.robots }}
     <meta name="robots" content="{{ . }}">
   {{ end }}
   {{ with .Params.robots }}
     <meta name="robots" content="{{ . }}">
+  {{ end }}
+  {{ if .IsHome }}
+    <meta name="robots" content="max-image-preview:large">
+  {{ else }}
+    <meta name="robots" content="max-image-preview:none">
   {{ end }}
   {{ if eq .Kind "404" }}
     <meta name="robots" content="noindex">
@@ -95,44 +97,26 @@
   <meta property="og:url" content="{{ .Permalink }}">
   <meta property="og:locale" content="{{ .Site.Language.Lang }}">
   <meta property="og:type" content="{{ $socialType }}">
-  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:card" content="{{ if .IsHome }}summary_large_image{{ else }}summary{{ end }}">
   <meta name="twitter:title" content="{{ $documentTitle | plainify | emojify }}">
   {{ with $metaDescription }}
     <meta name="twitter:description" content="{{ . | plainify }}">
   {{ end }}
 
-  {{/* Use a page image when available, otherwise the 1200x630 site image. */}}
-  {{ $featureImage := "" }}
-  {{ $pageImages := .Resources.ByType "image" }}
-  {{ range slice "*featured*" "*cover*" "*thumbnail*" }}
-    {{ if not $featureImage }}
-      {{ $featureImage = $pageImages.GetMatch . }}
-    {{ end }}
-  {{ end }}
-  {{ $socialImageURL := "" }}
-  {{ if $featureImage }}
-    {{ $socialImageURL = $featureImage.Permalink }}
-  {{ else }}
-    {{ with .Site.Params.defaultSocialImage }}
-      {{ $socialImage := "" }}
-      {{ if or (strings.HasPrefix . "http:") (strings.HasPrefix . "https:") }}
-        {{ $socialImage = resources.GetRemote . }}
-      {{ else }}
-        {{ $socialImage = resources.Get . }}
-      {{ end }}
+  {{/* Social image reserved for the homepage; articles and archives emit no image URL. */}}
+  {{ if .IsHome }}
+    {{ with .Site.Params.homepageSocialImage }}
+      {{ $socialImage := resources.Get . }}
       {{ with $socialImage }}
-        {{ $socialImageURL = .Permalink }}
+        <meta name="twitter:image" content="{{ .Permalink | absURL }}">
+        <meta name="twitter:image:alt" content="Field notes by Anass Chahbouni">
+        <meta property="og:image" content="{{ .Permalink | absURL }}">
+        <meta property="og:image:alt" content="Field notes by Anass Chahbouni">
+        <meta property="og:image:type" content="{{ .MediaType.Type }}">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
       {{ end }}
     {{ end }}
-  {{ end }}
-  {{ with $socialImageURL }}
-    <meta name="twitter:image" content="{{ . | absURL }}">
-    <meta name="twitter:image:alt" content="Anass Chahbouni — Field notes on security, systems and technology">
-    <meta property="og:image" content="{{ . | absURL }}">
-    <meta property="og:image:alt" content="Anass Chahbouni — Field notes on security, systems and technology">
-    <meta property="og:image:type" content="image/png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
   {{ end }}
 
   {{/* Site Verification */}}
